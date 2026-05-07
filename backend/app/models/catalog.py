@@ -16,7 +16,7 @@ class Course(Base):
 
 class Module(Base):
     id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("course.id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("course.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     order = Column(Integer, default=0)
@@ -45,7 +45,7 @@ class Lab(Base):
 
 class LabVersion(Base):
     id = Column(Integer, primary_key=True, index=True)
-    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False)
+    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False, index=True)
     version_number = Column(Integer, nullable=False)
     instructions_markdown = Column(Text, nullable=False)
     is_active = Column(Boolean, default=False)
@@ -55,8 +55,8 @@ class LabVersion(Base):
 
 class ModuleLabMapping(Base):
     id = Column(Integer, primary_key=True, index=True)
-    module_id = Column(Integer, ForeignKey("module.id"), nullable=False)
-    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False)
+    module_id = Column(Integer, ForeignKey("module.id"), nullable=False, index=True)
+    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False, index=True)
     order = Column(Integer, default=0)
 
     module = relationship("Module", back_populates="lab_mappings")
@@ -64,8 +64,8 @@ class ModuleLabMapping(Base):
 
 class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
-    cohort_id = Column(Integer, ForeignKey("cohort.id"), nullable=False)
-    course_id = Column(Integer, ForeignKey("course.id"), nullable=False)
+    cohort_id = Column(Integer, ForeignKey("cohort.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("course.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     cohort = relationship("Cohort", back_populates="enrollments")

@@ -5,9 +5,9 @@ from app.db.base_class import Base
 
 class LabSession(Base):
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
-    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False)
-    lab_version_id = Column(Integer, ForeignKey("labversion.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False, index=True)
+    lab_version_id = Column(Integer, ForeignKey("labversion.id"), nullable=False, index=True)
     
     status = Column(String, default="pending") # pending, provisioning, ready, failed, stopped, expired, completed
     runtime_provider = Column(String, default="mock")
@@ -32,10 +32,10 @@ class LabSession(Base):
 
 class Submission(Base):
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("labsession.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
-    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False)
-    lab_version_id = Column(Integer, ForeignKey("labversion.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey("labsession.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    lab_id = Column(Integer, ForeignKey("lab.id"), nullable=False, index=True)
+    lab_version_id = Column(Integer, ForeignKey("labversion.id"), nullable=False, index=True)
     
     attempt_number = Column(Integer, default=1)
     score = Column(Float, default=0.0)
@@ -54,7 +54,7 @@ class Submission(Base):
 
 class SubmissionResultItem(Base):
     id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey("submission.id"), nullable=False)
+    submission_id = Column(Integer, ForeignKey("submission.id"), nullable=False, index=True)
     
     check_key = Column(String, nullable=False)
     title = Column(String, nullable=False)
