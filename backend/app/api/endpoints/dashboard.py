@@ -87,8 +87,8 @@ def get_instructor_recent_activity(
     
     activity = []
     for sub in recent_submissions:
-        user = db.query(User).get(sub.user_id)
-        lab = db.query(Lab).get(sub.lab_id)
+        user = db.get(User, sub.user_id)
+        lab = db.get(Lab, sub.lab_id)
         activity.append({
             "id": sub.id,
             "student_name": user.full_name if user else "Unknown",

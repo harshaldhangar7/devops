@@ -21,10 +21,10 @@ class SubmissionService:
         if session.status != "ready":
             raise Exception(f"Session is not ready for checks (current status: {session.status})")
             
-        lab_version = self.db.query(LabVersion).get(session.lab_version_id)
+        lab_version = self.db.get(LabVersion, session.lab_version_id)
         
         # Enforce max attempts
-        lab = self.db.query(Lab).get(session.lab_id)
+        lab = self.db.get(Lab, session.lab_id)
         attempt_count = self.db.query(Submission).filter(
             Submission.session_id == session.id
         ).count()

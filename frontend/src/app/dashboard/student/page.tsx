@@ -2,95 +2,138 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Card, Skeleton, Button } from "@/components/ui/base";
+import { useAuth } from "@/context/AuthContext";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
 export default function StudentDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    if (!token) return;
     
-    fetch("http://127.0.0.1:8000/api/v1/dashboard/student/stats", {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => setStats(data));
-
-    fetch("http://127.0.0.1:8000/api/v1/sessions/", {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      const active = data.filter((s: any) => 
+    Promise.all([
+      fetch(`${API_URL}/dashboard/student/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => res.json()),
+      fetch(`${API_URL}/sessions/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => res.json())
+    ]).then(([statsData, sessionsData]) => {
+      setStats(statsData);
+      const active = Array.isArray(sessionsData) ? sessionsData.filter((s: any) => 
         ["pending", "provisioning", "ready"].includes(s.status)
-      );
+      ) : [];
       setActiveSessions(active);
+    }).catch(err => {
+      console.error("Dashboard data fetch error:", err);
+    }).finally(() => {
+      setIsInitialLoading(false);
     });
   }, []);
 
-  if (!stats) return <div className="p-8 text-center">Loading dashboard...</div>;
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-10">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-5 w-48" />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
+        </div>
+
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Student Dashboard</h2>
+    <div className="space-y-10">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Welcome back, {user?.full_name.split(' ')[0]}! 👋</h2>
+        <p className="text-gray-500 dark:text-gray-400">Here's an overview of your DevOps journey so far.</p>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Enrolled Courses</h3>
-          <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">{stats.enrolled_courses}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress Labs</h3>
-          <p className="mt-2 text-3xl font-semibold text-blue-600 dark:text-blue-400">{stats.in_progress_labs}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed Labs</h3>
-          <p className="mt-2 text-3xl font-semibold text-green-600 dark:text-green-400">{stats.completed_labs}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Score</h3>
-          <p className="mt-2 text-3xl font-semibold text-purple-600 dark:text-purple-400">{stats.recent_score}%</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Enrolled Courses</span>
+          <span className="text-4xl font-bold text-gray-900 dark:text-white leading-none">{stats?.enrolled_courses || 0}</span>
+        </Card>
+        
+        <Card className="flex flex-col gap-2 border-l-4 border-l-blue-500">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress Labs</span>
+          <span className="text-4xl font-bold text-blue-600 dark:text-blue-400 leading-none">{stats?.in_progress_labs || 0}</span>
+        </Card>
+
+        <Card className="flex flex-col gap-2 border-l-4 border-l-green-500">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed Labs</span>
+          <span className="text-4xl font-bold text-green-600 dark:text-green-400 leading-none">{stats?.completed_labs || 0}</span>
+        </Card>
+
+        <Card className="flex flex-col gap-2 border-l-4 border-l-purple-500">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Score</span>
+          <span className="text-4xl font-bold text-purple-600 dark:text-purple-400 leading-none">{stats?.recent_score || 0}%</span>
+        </Card>
       </div>
 
       {activeSessions.length > 0 && (
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-lg border border-indigo-200 dark:border-indigo-800">
-          <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-300 mb-4 flex items-center">
-            <span className="flex h-3 w-3 rounded-full bg-indigo-500 mr-2 animate-pulse"></span>
+        <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+            <span className="flex h-3 w-3 rounded-full bg-indigo-500 animate-pulse"></span>
             Active Lab Sessions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeSessions.map((session) => (
-              <div key={session.id} className="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm border border-indigo-100 dark:border-indigo-900">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Lab #{session.lab_id}</h4>
-                  <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">{session.status}</span>
+              <Card key={session.id} className="relative overflow-hidden group hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Lab #{session.lab_id}</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Started {new Date(session.started_at).toLocaleTimeString()}</p>
+                  </div>
+                  <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded font-bold uppercase tracking-wider">
+                    {session.status}
+                  </span>
                 </div>
-                <div className="mt-4">
-                  <Link 
-                    href={`/dashboard/student/labs/${session.lab_id}/session`}
-                    className="block w-full text-center py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 transition-colors"
-                  >
-                    Resume Lab
-                  </Link>
-                </div>
-              </div>
+                
+                <Link href={`/dashboard/student/labs/${session.lab_id}/session`} className="block">
+                  <Button className="w-full">Resume Lab</Button>
+                </Link>
+              </Card>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Your Courses</h3>
-        </div>
-        <div className="p-6">
-          <Link href="/dashboard/student/courses/1" className="block w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700 border rounded-md transition-colors">
-            <h4 className="font-semibold text-gray-900 dark:text-white text-lg">DevOps Foundations</h4>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Learn the basics of DevOps, CI/CD, and Containers.</p>
+      <section>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Your Courses</h3>
+        <div className="grid grid-cols-1 gap-6">
+          <Link href="/dashboard/student/courses/1" className="group">
+            <Card className="group-hover:border-indigo-300 dark:group-hover:border-indigo-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex-1">
+                <h4 className="font-bold text-xl text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">DevOps Foundations</h4>
+                <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-2xl">
+                  Master the core principles of DevOps, including Infrastructure as Code, CI/CD pipelines, and modern container orchestration.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs font-medium">12 Labs</span>
+                  <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs font-medium">8 Hours</span>
+                  <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-xs font-medium">Beginner</span>
+                </div>
+              </div>
+              <Button variant="secondary" className="md:w-auto w-full group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                Continue Learning
+              </Button>
+            </Card>
           </Link>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
