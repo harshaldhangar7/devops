@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.progress import LabSession
 from app.models.catalog import Lab, LabVersion
-from app.services.lab.runtime import LocalMockRuntimeProvider
+from app.services.lab.runtime import DockerRuntimeProvider
 from datetime import datetime
 
 class SessionService:
     def __init__(self, db: Session):
         self.db = db
-        self.runtime = LocalMockRuntimeProvider()
+        self.runtime = DockerRuntimeProvider()
 
     def start_session(self, user_id: int, lab_id: int) -> LabSession:
         # Check for active session

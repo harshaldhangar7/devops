@@ -17,7 +17,7 @@ export default function LandingPage() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-widest text-gray-500">
             <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
-            <a href="#labs" className="hover:text-indigo-600 transition-colors">Labs</a>
+            <Link href="/catalog" className="hover:text-indigo-600 transition-colors">Labs</Link>
             <a href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</a>
           </div>
           <div className="flex items-center gap-4">
@@ -55,10 +55,12 @@ export default function LandingPage() {
                 Launch My Lab
               </Button>
             </Link>
-            <Button variant="secondary" className="w-full sm:w-48 py-4 text-base font-black tracking-widest group">
-              View Curriculum 
-              <span className="ml-2 group-hover:translate-x-1 transition-transform">→</span>
-            </Button>
+            <Link href="/catalog" className="w-full sm:w-auto">
+              <Button variant="secondary" className="w-full sm:w-48 py-4 text-base font-black tracking-widest group">
+                View Catalog 
+                <span className="ml-2 group-hover:translate-x-1 transition-transform">→</span>
+              </Button>
+            </Link>
           </div>
 
           {/* Hero Mockup Preview */}
