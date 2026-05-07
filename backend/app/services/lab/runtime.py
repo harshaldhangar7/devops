@@ -59,7 +59,7 @@ class LocalMockRuntimeProvider(LabRuntimeProvider):
     def refresh_or_tick_session_state(self, db: Session, session: LabSession) -> LabSession:
         # Simulate provisioning delay: if provisioning for more than 5 seconds, make it ready
         if session.status == "provisioning":
-            if datetime.utcnow() > session.started_at + timedelta(seconds=5):
+            if datetime.utcnow() > session.started_at + timedelta(seconds=2):
                 session.status = "ready"
                 session.workspace_url = f"https://mock-workspace.devops-lab.local/{session.id}"
                 db.add(session)

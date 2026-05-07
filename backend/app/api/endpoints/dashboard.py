@@ -83,16 +83,19 @@ def get_instructor_recent_activity(
     if current_user.role != "instructor" and current_user.role != "admin":
         return {"error": "Not an instructor"}
 
-    recent_submissions = db.query(Submission).order_by(Submission.created_at.desc()).limit(10).all()
+    # Optimized query with JOINs to avoid N+1 issue
+    results = db.query(Submission, User.full_name, Lab.title)\
+        .join(User, Submission.user_id == User.id)\
+        .join(Lab, Submission.lab_id == Lab.id)\
+        .order_by(Submission.created_at.desc())\
+        .limit(10).all()
     
     activity = []
-    for sub in recent_submissions:
-        user = db.get(User, sub.user_id)
-        lab = db.get(Lab, sub.lab_id)
+    for sub, student_name, lab_title in results:
         activity.append({
             "id": sub.id,
-            "student_name": user.full_name if user else "Unknown",
-            "lab_title": lab.title if lab else "Unknown Lab",
+            "student_name": student_name,
+            "lab_title": lab_title,
             "score": sub.score,
             "passed": sub.passed,
             "created_at": sub.created_at,
