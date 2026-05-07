@@ -1,10 +1,11 @@
 import logging
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.catalog import Course, Module, Lab, LabVersion, ModuleLabMapping, Enrollment
 from app.models.cohort import Cohort, CohortMember
-from app.models.progress import LabSession
+from app.models.progress import LabSession, Submission, SubmissionResultItem
 from app.core.security import get_password_hash
 
 logging.basicConfig(level=logging.INFO)
@@ -34,8 +35,6 @@ def seed() -> None:
             db.commit()
             logger.info(f"Created user: {u['email']}")
         user_objects[u["email"]] = user
-
-    # Phase 2 Seeds: Cohorts, Courses, Labs
     
     # 1. Cohort
     cohort = db.query(Cohort).filter(Cohort.name == "Spring 2026").first()
@@ -80,15 +79,44 @@ def seed() -> None:
         db.commit()
 
         # Lab Versions
-        db.add(LabVersion(lab_id=lab1.id, version_number=1, instructions_markdown="Change permissions to 755.", is_active=True))
-        db.add(LabVersion(lab_id=lab2.id, version_number=1, instructions_markdown="Run a docker hello-world container.", is_active=True))
+        lv1 = LabVersion(lab_id=lab1.id, version_number=1, instructions_markdown="Change permissions to 755.", is_active=True)
+        lv2 = LabVersion(lab_id=lab2.id, version_number=1, instructions_markdown="Run a docker hello-world container.", is_active=True)
+        db.add(lv1)
+        db.add(lv2)
         db.commit()
 
-        # Add LabSession for student1 so dashboard is not empty
-        db.add(LabSession(user_id=user_objects["student1@example.com"].id, lab_id=lab1.id, status="completed", score=100.0))
-        db.add(LabSession(user_id=user_objects["student1@example.com"].id, lab_id=lab2.id, status="in_progress", score=0.0))
+        # LabSessions and Submissions for Student 1
+        s1 = user_objects["student1@example.com"]
+        
+        # Session 1: Completed
+        sess1 = LabSession(
+            user_id=s1.id, lab_id=lab1.id, lab_version_id=lv1.id, 
+            status="completed", started_at=datetime.utcnow() - timedelta(days=1),
+            completed_at=datetime.utcnow() - timedelta(days=1, hours=1)
+        )
+        db.add(sess1)
+        db.flush()
+        
+        sub1 = Submission(
+            session_id=sess1.id, user_id=s1.id, lab_id=lab1.id, lab_version_id=lv1.id,
+            attempt_number=1, score=100.0, passed=True, checker_provider="mock",
+            summary="All checks passed."
+        )
+        db.add(sub1)
+        db.flush()
+        
+        db.add(SubmissionResultItem(submission_id=sub1.id, check_key="perm", title="Correct Permissions", status="success", score_awarded=100.0, max_score=100.0))
+        
+        # Session 2: Provisioning (Ready)
+        sess2 = LabSession(
+            user_id=s1.id, lab_id=lab2.id, lab_version_id=lv2.id, 
+            status="ready", started_at=datetime.utcnow() - timedelta(minutes=10),
+            workspace_url="https://mock-workspace.devops-lab.local/seed-2"
+        )
+        db.add(sess2)
+        
         db.commit()
-        logger.info("Created Catalog Data (Course, Modules, Labs, Progress)")
+        logger.info("Created Catalog Data and Lab Sessions")
 
     db.close()
 

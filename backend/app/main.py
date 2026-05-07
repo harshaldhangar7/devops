@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.endpoints import auth, users, dashboard, courses, labs, cohorts
+from app.api.endpoints import auth, users, dashboard, courses, labs, cohorts, sessions, submissions
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json"
@@ -28,6 +28,8 @@ app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", 
 app.include_router(courses.router, prefix=f"{settings.API_V1_STR}/courses", tags=["courses"])
 app.include_router(labs.router, prefix=f"{settings.API_V1_STR}/labs", tags=["labs"])
 app.include_router(cohorts.router, prefix=f"{settings.API_V1_STR}/cohorts", tags=["cohorts"])
+app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["sessions"])
+app.include_router(submissions.router, prefix=f"{settings.API_V1_STR}/submissions", tags=["submissions"])
 
 @app.get("/health")
 def health_check():

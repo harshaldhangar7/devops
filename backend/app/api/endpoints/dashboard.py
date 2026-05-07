@@ -1,11 +1,12 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.user import User
-from app.models.cohort import CohortMember
-from app.models.catalog import Course, Enrollment
-from app.models.progress import LabSession
+from app.models.cohort import CohortMember, Cohort
+from app.models.catalog import Course, Enrollment, Lab
+from app.models.progress import LabSession, Submission
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -31,12 +32,13 @@ def get_student_dashboard_stats(
     # Get lab stats
     lab_sessions = db.query(LabSession).filter(LabSession.user_id == current_user.id).all()
     completed_labs = sum(1 for s in lab_sessions if s.status == "completed")
-    in_progress_labs = sum(1 for s in lab_sessions if s.status == "in_progress")
+    in_progress_labs = sum(1 for s in lab_sessions if s.status in ["pending", "provisioning", "ready"])
     
-    # Calculate score
+    # Calculate score from best submissions
+    best_submissions = db.query(func.max(Submission.score)).filter(Submission.user_id == current_user.id).group_by(Submission.lab_id).all()
     recent_score = 0
-    if lab_sessions:
-        recent_score = sum(s.score for s in lab_sessions) / len(lab_sessions)
+    if best_submissions:
+        recent_score = sum(s[0] for s in best_submissions) / len(best_submissions)
 
     return {
         "enrolled_courses": enrolled_courses,
@@ -56,9 +58,45 @@ def get_instructor_cohort_summary(
     if current_user.role != "instructor" and current_user.role != "admin":
         return {"error": "Not an instructor"}
 
-    # Just giving dummy stats for now, real implementation would aggregate student stats per cohort
+    # Total students in cohorts the instructor might be interested in
+    # (For now, just all students as a simplification)
+    total_students = db.query(User).filter(User.role == "student").count()
+    assigned_cohorts = db.query(Cohort).count()
+    
+    # Average score across all submissions
+    avg_score = db.query(func.avg(Submission.score)).scalar() or 0.0
+
     return {
-        "assigned_cohorts": 1,
-        "total_students": 5,
-        "average_score": 85.5
+        "assigned_cohorts": assigned_cohorts,
+        "total_students": total_students,
+        "average_score": round(float(avg_score), 1)
     }
+
+@router.get("/instructor/recent-activity")
+def get_instructor_recent_activity(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get recent submissions and sessions for instructor.
+    """
+    if current_user.role != "instructor" and current_user.role != "admin":
+        return {"error": "Not an instructor"}
+
+    recent_submissions = db.query(Submission).order_by(Submission.created_at.desc()).limit(10).all()
+    
+    activity = []
+    for sub in recent_submissions:
+        user = db.query(User).get(sub.user_id)
+        lab = db.query(Lab).get(sub.lab_id)
+        activity.append({
+            "id": sub.id,
+            "student_name": user.full_name if user else "Unknown",
+            "lab_title": lab.title if lab else "Unknown Lab",
+            "score": sub.score,
+            "passed": sub.passed,
+            "created_at": sub.created_at,
+            "type": "submission"
+        })
+
+    return activity

@@ -3,11 +3,20 @@
 ## Overview
 A real full-stack web application for training students through practical browser-based labs. Features role-based access control (Student, Instructor, Admin), interactive lab sessions with a mock runtime, automated checking, and a clean, modern Next.js frontend.
 
+## Phase 3: Hands-on Practice Workflow
+The platform now supports the full end-to-end lab session lifecycle:
+- Students can start labs, launching a mock container-like environment.
+- Automated checkers validate student work and provide immediate feedback.
+- Persistent submissions track progress and scores.
+- Instructors can monitor student activity in real-time.
+
 ## Architecture & Tech Stack
 - **Frontend**: Next.js (App Router), TypeScript, TailwindCSS
 - **Backend**: FastAPI, Python, SQLAlchemy, Alembic
 - **Database**: SQLite (default for development), PostgreSQL-ready
 - **Authentication**: JWT-based with bcrypt password hashing
+- **Runtime**: Pluggable provider system (Mock for dev, ready for Docker/Kubernetes)
+- **Checker**: Pluggable automated assessment system
 
 ## Local Development (No Docker Required)
 
@@ -30,7 +39,7 @@ A real full-stack web application for training students through practical browse
    ```bash
    alembic upgrade head
    ```
-5. Seed initial data:
+5. Seed initial data (includes Phase 3 lab versions and sessions):
    ```bash
    python seed.py
    ```
@@ -55,4 +64,12 @@ A real full-stack web application for training students through practical browse
 The `seed.py` script provisions the following users (all have the password `password123`):
 - Admin: `admin@example.com`
 - Instructor: `instructor@example.com`
-- Student: `student@example.com`
+- Student 1: `student1@example.com`
+- Student 2: `student2@example.com`
+
+## Running Tests
+```bash
+cd backend
+.\venv\Scripts\activate
+pytest
+```
