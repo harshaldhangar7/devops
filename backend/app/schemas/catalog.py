@@ -73,10 +73,25 @@ class LabUpdate(BaseModel):
     passing_score: Optional[int] = None
     max_attempts: Optional[int] = None
 
+# Lab Versions
+class LabVersionBase(BaseModel):
+    version_number: int
+    instructions_markdown: str
+    is_active: bool = False
+
+class LabVersion(LabVersionBase):
+    id: int
+    lab_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class Lab(LabBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime]
+    versions: List[LabVersion] = []
 
     class Config:
         from_attributes = True

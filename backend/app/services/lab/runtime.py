@@ -28,6 +28,10 @@ class LabRuntimeProvider(ABC):
         pass
 
     @abstractmethod
+    def exec_command(self, session: LabSession, command: str) -> str:
+        pass
+
+    @abstractmethod
     def refresh_or_tick_session_state(self, db: Session, session: LabSession) -> LabSession:
         pass
 
@@ -118,6 +122,28 @@ class DockerRuntimeProvider(LabRuntimeProvider):
         db.commit()
         db.refresh(session)
         return session
+
+    def exec_command(self, session: LabSession, command: str) -> str:
+        if not self.client or not session.metadata_json or "container_id" not in session.metadata_json:
+            return "Error: Container not reachable"
+            
+        try:
+            container = self.client.containers.get(session.metadata_json["container_id"])
+            # Enabling TTY can help with output capturing on some Windows environments
+            exec_result = container.exec_run(["sh", "-c", command], stdout=True, stderr=True, tty=True)
+            exit_code = exec_result.exit_code
+            output = exec_result.output
+            decoded_output = output.decode('utf-8').strip()
+            
+            if not decoded_output:
+                if exit_code == 0:
+                    return "(command executed successfully, no output produced)"
+                else:
+                    return f"(command failed with exit code {exit_code}, no output produced)"
+            
+            return decoded_output
+        except Exception as e:
+            return f"Error executing command: {str(e)}"
 
     def refresh_or_tick_session_state(self, db: Session, session: LabSession) -> LabSession:
         if session.status == "ready" and session.expires_at:

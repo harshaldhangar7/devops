@@ -1,9 +1,9 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api import deps
-from app.models.catalog import Lab
+from app.models.catalog import Lab, LabVersion
 from app.schemas.catalog import Lab as LabSchema, LabCreate, LabUpdate
 from app.models.user import User
 
@@ -16,7 +16,7 @@ def read_labs(
     limit: int = 100,
 ) -> Any:
     """Retrieve labs."""
-    labs = db.query(Lab).offset(skip).limit(limit).all()
+    labs = db.query(Lab).options(joinedload(Lab.versions)).offset(skip).limit(limit).all()
     return labs
 
 @router.post("/", response_model=LabSchema)
@@ -40,7 +40,7 @@ def read_lab(
     lab_id: int,
 ) -> Any:
     """Get lab by ID."""
-    lab = db.query(Lab).filter(Lab.id == lab_id).first()
+    lab = db.query(Lab).options(joinedload(Lab.versions)).filter(Lab.id == lab_id).first()
     if not lab:
         raise HTTPException(status_code=404, detail="Lab not found")
     return lab

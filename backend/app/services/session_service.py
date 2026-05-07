@@ -68,5 +68,11 @@ class SessionService:
             raise Exception("Session not found")
         return self.runtime.stop_session(self.db, session)
 
+    def exec_command(self, session_id: int, user_id: int, command: str) -> str:
+        session = self.get_session_detail(session_id, user_id)
+        if not session or session.status != "ready":
+            return "Error: Session not ready"
+        return self.runtime.exec_command(session, command)
+
     def list_user_sessions(self, user_id: int):
         return self.db.query(LabSession).filter(LabSession.user_id == user_id).all()

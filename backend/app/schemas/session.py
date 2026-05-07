@@ -67,3 +67,6 @@ class LabSessionCreate(BaseModel):
 
 class LabSessionUpdate(BaseModel):
     status: Optional[str] = None
+
+class CommandRequest(BaseModel):
+    command: str

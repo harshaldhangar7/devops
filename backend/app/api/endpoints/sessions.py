@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
-from app.schemas.session import LabSession, LabSessionCreate
+from app.schemas.session import LabSession, LabSessionCreate, CommandRequest
 from app.services.session_service import SessionService
 from app.models.user import User
 
@@ -85,6 +85,25 @@ def stop_session(
         return service.stop_session(session_id=session_id, user_id=current_user.id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{session_id}/exec")
+def execute_command(
+    *,
+    db: Session = Depends(deps.get_db),
+    session_id: int,
+    command_in: CommandRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Execute a command in the lab session container.
+    """
+    service = SessionService(db)
+    result = service.exec_command(
+        session_id=session_id, 
+        user_id=current_user.id, 
+        command=command_in.command
+    )
+    return {"output": result}
 
 @router.get("/", response_model=List[LabSession])
 def list_my_sessions(

@@ -20,6 +20,20 @@ export default function LabSessionPage() {
   const [error, setError] = useState<string | null>(null);
   const pollingInterval = useRef<any>(null);
 
+  // Terminal State
+  const [terminalLogs, setTerminalLogs] = useState<any[]>([]);
+  const [currentCommand, setCurrentCommand] = useState("");
+  const [isExecuting, setIsExecuting] = useState(false);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [terminalLogs]);
+
   const fetchSession = async () => {
     const token = localStorage.getItem("token");
     try {
@@ -93,6 +107,36 @@ export default function LabSessionPage() {
     }
   }, [session?.id]);
 
+  const handleCommandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentCommand.trim() || isExecuting || !session) return;
+
+    const cmd = currentCommand;
+    setCurrentCommand("");
+    setIsExecuting(true);
+    
+    // Add user command to logs
+    setTerminalLogs(prev => [...prev, { type: 'input', text: cmd }]);
+
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/sessions/${session.id}/exec`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ command: cmd })
+      });
+      const data = await res.json();
+      setTerminalLogs(prev => [...prev, { type: 'output', text: data.output }]);
+    } catch (err) {
+      setTerminalLogs(prev => [...prev, { type: 'error', text: "Failed to execute command." }]);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   const runChecks = async () => {
     if (!session || runningChecks) return;
     setRunningChecks(true);
@@ -129,6 +173,7 @@ export default function LabSessionPage() {
       const data = await res.json();
       setSession(data);
       setSubmissions([]);
+      setTerminalLogs([]);
     } catch (err) {
       console.error("Error resetting session:", err);
     }
@@ -167,13 +212,18 @@ export default function LabSessionPage() {
   const isReady = session.status === "ready";
   const isCompleted = session.status === "completed";
 
+  // Get active version instructions
+  const instructions = lab?.versions?.find((v: any) => v.is_active)?.instructions_markdown 
+                    || lab?.versions?.[0]?.instructions_markdown 
+                    || "No instructions available.";
+
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <Card className="flex justify-between items-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-gray-200/50 dark:border-gray-800/50 p-4 sticky top-0 z-10">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-            💻
+          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xl">
+            LAB
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{lab?.title}</h2>
@@ -187,20 +237,15 @@ export default function LabSessionPage() {
                 {isProvisioning && <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-ping"></span>}
                 {session.status}
               </span>
-              {session.expires_at && isReady && (
-                <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
-                  ⏱️ {new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
             </div>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={resetSession} disabled={isProvisioning || runningChecks}>
-            Reset Environment
+            Reset Lab
           </Button>
           <Button variant="danger" onClick={stopSession}>
-            Exit Lab
+            End Session
           </Button>
         </div>
       </Card>
@@ -211,17 +256,13 @@ export default function LabSessionPage() {
           <Card className="flex-1 flex flex-col p-0 overflow-hidden border-gray-200/50 dark:border-gray-800/50">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between">
               <h3 className="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Instructions</h3>
-              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Step 1 of 4</span>
+              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">Lab Content</span>
             </div>
             <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
               <div className="prose dark:prose-invert prose-sm max-w-none">
-                {lab?.versions?.[0]?.instructions_markdown ? (
-                  lab.versions[0].instructions_markdown.split('\n').map((line: string, i: number) => (
-                    <p key={i}>{line}</p>
-                  ))
-                ) : (
-                  <p className="italic text-gray-400">No instructions available.</p>
-                )}
+                {instructions.split('\n').map((line: string, i: number) => (
+                  <p key={i}>{line}</p>
+                ))}
               </div>
             </div>
           </Card>
@@ -229,106 +270,94 @@ export default function LabSessionPage() {
 
         {/* Middle Panel: Workspace & Terminal */}
         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-          <div className="flex-1 bg-[#0d1117] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-800 group">
+          <div className="flex-1 bg-[#0d1117] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-800">
             {/* Terminal Header */}
             <div className="px-4 py-3 bg-[#161b22] border-b border-gray-800 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 bg-[#ff5f56] rounded-full shadow-lg shadow-red-500/10"></div>
-                  <div className="w-3 h-3 bg-[#ffbd2e] rounded-full shadow-lg shadow-yellow-500/10"></div>
-                  <div className="w-3 h-3 bg-[#27c93f] rounded-full shadow-lg shadow-green-500/10"></div>
+                  <div className="w-3 h-3 bg-[#ff5f56] rounded-full shadow-lg"></div>
+                  <div className="w-3 h-3 bg-[#ffbd2e] rounded-full shadow-lg"></div>
+                  <div className="w-3 h-3 bg-[#27c93f] rounded-full shadow-lg"></div>
                 </div>
                 <div className="h-4 w-[1px] bg-gray-700 mx-1"></div>
                 <span className="text-[11px] text-gray-400 font-mono tracking-tight uppercase">Terminal — student@devops-guru</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-500 font-mono italic">
-                  {session.workspace_url ? "Connected via SSH" : "Waiting for socket..."}
-                </span>
-                <div className={`w-1.5 h-1.5 rounded-full ${isReady ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`}></div>
-              </div>
+              <div className={`w-2 h-2 rounded-full ${isReady ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`}></div>
             </div>
 
             {/* Terminal Body */}
-            <div className="p-6 font-mono text-sm overflow-y-auto flex-1 custom-scrollbar leading-relaxed">
+            <div className="p-6 font-mono text-sm overflow-y-auto flex-1 custom-scrollbar bg-[#0d1117]">
               {isProvisioning ? (
                 <div className="space-y-2 text-indigo-400/80">
                   <p className="flex items-center gap-2">
                     <span className="text-gray-600 font-bold">➜</span> 
-                    <span>Initializing DevOps Lab Environment...</span>
+                    <span>Initializing Docker Runtime Engine...</span>
                   </p>
-                  <p className="pl-5 text-gray-500 animate-pulse flex items-center gap-2">
-                    <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-                    Pulling alpine-linux:latest...
-                  </p>
-                  <p className="pl-5 text-gray-500 flex items-center gap-2">
-                    <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-                    Mounting persistent storage...
-                  </p>
-                  <p className="pl-5 text-gray-500 flex items-center gap-2">
-                    <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-                    Injecting SSH keys...
-                  </p>
-                  <div className="mt-6 flex justify-center">
-                    <div className="flex gap-1">
-                      <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                      <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                      <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce"></div>
-                    </div>
-                  </div>
+                  <p className="pl-5 text-gray-500 animate-pulse">Pulling required images...</p>
                 </div>
               ) : isReady ? (
-                <div className="space-y-4">
-                  <div className="text-green-500 opacity-80 mb-6">
-                    <p>***************************************************</p>
-                    <p>* WELCOME TO DEVOPS GURU LABS v1.2.0           *</p>
-                    <p>* Environment: Ubuntu 22.04 LTS (Jammy)        *</p>
-                    <p>***************************************************</p>
+                <div className="space-y-2">
+                  <div className="text-green-500 opacity-80 mb-4 whitespace-pre-wrap font-bold">
+{`***************************************************
+* WELCOME TO DEVOPS GURU LABS v1.2.0           *
+* Node: container-primary-01                   *
+***************************************************`}
                   </div>
                   
-                  <p className="text-gray-300">Your environment is ready. Current user: <span className="text-indigo-400">student</span></p>
-                  
-                  <div className="flex gap-2 text-gray-400">
-                    <span className="text-indigo-500 font-bold">student@devops-guru:~$</span>
-                    <span className="relative">
-                      _
-                      <span className="absolute inset-0 bg-white/20 animate-pulse w-2"></span>
-                    </span>
-                  </div>
+                  {/* Previous Command History */}
+                  {terminalLogs.map((log, i) => (
+                    <div key={i} className="space-y-1">
+                      {log.type === 'input' && (
+                        <div className="flex gap-2 text-gray-400">
+                          <span className="text-indigo-500 font-bold">student@devops-guru:~$</span>
+                          <span className="text-white">{log.text}</span>
+                        </div>
+                      )}
+                      {log.type === 'output' && (
+                        <div className="text-gray-300 whitespace-pre-wrap pl-2 border-l border-gray-800">{log.text || "(no output)"}</div>
+                      )}
+                      {log.type === 'error' && (
+                        <div className="text-red-400 italic pl-2">{log.text}</div>
+                      )}
+                    </div>
+                  ))}
 
-                  <div className="mt-12 p-4 bg-[#1c2128] rounded-xl border border-gray-800/50">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-3">Runtime Engine Hints</p>
-                    <ul className="text-xs space-y-2 text-gray-400">
-                      <li className="flex items-center gap-2">
-                        <span className="w-1 h-1 bg-indigo-500 rounded-full"></span>
-                        This is a simulated environment for learning purposes.
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1 h-1 bg-indigo-500 rounded-full"></span>
-                        Click the <span className="text-indigo-400 font-bold uppercase tracking-widest text-[9px] bg-indigo-400/10 px-1 rounded">Run Checks</span> button to validate your work.
-                      </li>
-                    </ul>
-                  </div>
+                  {/* Current Prompt */}
+                  {!isCompleted && (
+                    <form onSubmit={handleCommandSubmit} className="flex gap-2 text-gray-400 items-center">
+                      <span className="text-indigo-500 font-bold shrink-0">student@devops-guru:~$</span>
+                      <input 
+                        type="text"
+                        autoFocus
+                        value={currentCommand}
+                        onChange={(e) => setCurrentCommand(e.target.value)}
+                        disabled={isExecuting}
+                        className="bg-transparent border-none outline-none text-white w-full p-0 font-mono focus:ring-0"
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                      {isExecuting && <span className="w-2 h-4 bg-indigo-500 animate-pulse"></span>}
+                    </form>
+                  )}
+                  
+                  <div ref={terminalEndRef} />
                 </div>
               ) : isCompleted ? (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                  <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center text-3xl animate-bounce">
-                    🏆
-                  </div>
-                  <h4 className="text-xl font-bold text-purple-400 uppercase tracking-widest">Lab Completed</h4>
-                  <p className="text-gray-500 max-w-xs">You have successfully mastered this objective. Review your score on the right.</p>
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <h4 className="text-xl font-bold text-purple-400 uppercase tracking-widest mb-2">Lab Completed</h4>
+                  <p className="text-gray-500">You can now exit this session.</p>
                 </div>
               ) : (
                 <p className="text-red-400">Environment status: {session.status}</p>
               )}
             </div>
             
-            {isReady && (
+            {isReady && !isCompleted && (
               <div className="p-6 bg-[#161b22] border-t border-gray-800">
                 <Button 
                   onClick={runChecks}
                   isLoading={runningChecks}
-                  className="w-full py-4 text-base font-black tracking-widest uppercase shadow-xl shadow-indigo-500/20"
+                  className="w-full py-4 text-base font-black tracking-widest uppercase shadow-xl"
                 >
                   Run Automated Checks
                 </Button>
@@ -355,24 +384,20 @@ export default function LabSessionPage() {
                 </div>
               ) : (
                 submissions.map((sub) => (
-                  <div key={sub.id} className="group p-4 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900 hover:border-indigo-200 dark:hover:border-indigo-900 transition-all shadow-sm">
+                  <div key={sub.id} className="p-4 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Attempt #{sub.attempt_number}</span>
                       <span className={`text-xs font-black px-2 py-1 rounded-lg ${sub.passed ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
                         {sub.score}%
                       </span>
                     </div>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       {sub.results?.map((res: any) => (
-                        <div key={res.id} className="flex items-center gap-3">
-                          <div className={`w-1.5 h-1.5 rounded-full ${res.status === "success" ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.4)]"}`}></div>
-                          <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 flex-1 truncate">{res.title}</span>
+                        <div key={res.id} className="flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full ${res.status === "success" ? "bg-green-500" : "bg-red-500"}`}></div>
+                          <span className="text-[11px] text-gray-600 dark:text-gray-400 flex-1 truncate">{res.title}</span>
                         </div>
                       ))}
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-800/50 flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(sub.created_at).toLocaleTimeString()}</span>
-                      <span className="text-[9px] font-bold text-indigo-400 uppercase cursor-pointer hover:underline">View Details</span>
                     </div>
                   </div>
                 ))
